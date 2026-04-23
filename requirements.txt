@@ -3,7 +3,7 @@ uvicorn
 python-multipart
 opencv-python-headless
 numpy
-ultralytics
+ultralytics==8.0.20
 torch
 torchvision
 huggingface_hub
