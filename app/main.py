@@ -3,13 +3,17 @@ from fastapi.responses import StreamingResponse
 import numpy as np
 import cv2
 import io
-import json
+import os
 
 from app.inference import YOLOv12Model, draw_boxes, format_detections
 
 app = FastAPI()
 
-model = YOLOv12Model("best.pt")
+# 🔥 FIXED model path (works on Render)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "..", "best.pt")
+
+model = YOLOv12Model(MODEL_PATH)
 
 
 @app.get("/")
@@ -17,32 +21,42 @@ def home():
     return {"message": "Pothole Detection API Running"}
 
 
+# 🔴 IMAGE OUTPUT (what you want)
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    contents = await file.read()
+    try:
+        contents = await file.read()
 
-    # Convert image
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # Run model
-    detections = model.predict(img)
+        detections = model.predict(img)
 
-    # Draw bounding boxes
-    output_img = draw_boxes(img, detections)
+        # Draw boxes
+        output_img = draw_boxes(img, detections)
 
-    # Convert image to bytes
-    _, buffer = cv2.imencode(".jpg", output_img)
-    io_buf = io.BytesIO(buffer)
+        # Convert to image response
+        _, buffer = cv2.imencode(".jpg", output_img)
+        io_buf = io.BytesIO(buffer)
 
-    # Format readable output
-    formatted = format_detections(detections)
+        return StreamingResponse(io_buf, media_type="image/jpeg")
 
-    # Send info in headers
-    headers = {
-        "Pothole-Detection-Count": str(formatted["count"]),
-        "Pothole-Detection-Message": formatted["message"],
-        "Pothole-Detections": json.dumps(formatted["detections"])
-    }
+    except Exception as e:
+        return {"error": str(e)}
 
-    return StreamingResponse(io_buf, media_type="image/jpeg", headers=headers)
+
+# 🟢 TEXT OUTPUT (for understanding)
+@app.post("/predict-json")
+async def predict_json(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        detections = model.predict(img)
+
+        return format_detections(detections)
+
+    except Exception as e:
+        return {"error": str(e)}
