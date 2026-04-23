@@ -3,9 +3,5 @@ uvicorn
 python-multipart
 opencv-python-headless
 numpy
-ultralytics==8.0.20
 torch
 torchvision
-huggingface_hub
-timm
-einops

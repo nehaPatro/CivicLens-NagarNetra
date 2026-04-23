@@ -1,34 +1,44 @@
-from ultralytics import YOLO
+import sys
+import os
 import cv2
+import torch
+
+# 🔥 Use your local yolov12 repo
+sys.path.append(os.path.abspath("yolov12"))
+
+from models.common import DetectMultiBackend
+from utils.general import non_max_suppression
+from utils.torch_utils import select_device
 
 
 class YOLOv12Model:
     def __init__(self, weights_path):
-        self.model = YOLO(weights_path)
+        self.device = select_device("cpu")
+        self.model = DetectMultiBackend(weights_path, device=self.device)
 
     def predict(self, img):
-        if img is None:
-            return []
+        img0 = img.copy()
 
-        results = self.model(img)
+        img = cv2.resize(img, (640, 640))
+        img = img.transpose((2, 0, 1))
+        img = torch.from_numpy(img).float() / 255.0
+        img = img.unsqueeze(0).to(self.device)
+
+        pred = self.model(img)
+        pred = non_max_suppression(pred, 0.25, 0.45)
 
         detections = []
 
-        for r in results:
-            boxes = r.boxes
-            if boxes is None:
-                continue
+        for det in pred:
+            if len(det):
+                for *xyxy, conf, cls in det:
+                    x1, y1, x2, y2 = [int(x.item()) for x in xyxy]
 
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                conf = float(box.conf[0].cpu().numpy())
-                cls = int(box.cls[0].cpu().numpy())
-
-                detections.append({
-                    "class_id": cls,
-                    "confidence": conf,
-                    "bbox": [x1, y1, x2, y2]
-                })
+                    detections.append({
+                        "class_id": int(cls.item()),
+                        "confidence": float(conf.item()),
+                        "bbox": [x1, y1, x2, y2]
+                    })
 
         return detections
 
@@ -37,36 +47,21 @@ def draw_boxes(img, detections):
     img = img.copy()
 
     for det in detections:
-        x1, y1, x2, y2 = map(int, det["bbox"])
+        x1, y1, x2, y2 = det["bbox"]
         conf = det["confidence"]
 
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
         label = f"Pothole {conf:.2f}"
-
-        cv2.putText(
-            img,
-            label,
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 0, 255),
-            2
-        )
+        cv2.putText(img, label, (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
     return img
 
 
 def format_detections(detections):
-    if len(detections) == 0:
-        return {
-            "count": 0,
-            "message": "No potholes detected",
-            "detections": []
-        }
-
     return {
         "count": len(detections),
-        "message": f"{len(detections)} pothole(s) detected",
+        "message": f"{len(detections)} pothole(s) detected" if detections else "No potholes detected",
         "detections": detections
     }
