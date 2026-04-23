@@ -4,7 +4,7 @@ import cv2
 
 class YOLOv12Model:
     def __init__(self, weights_path):
-        self.model = YOLO("yolov8n.pt")
+        self.model = YOLO(weights_path)
 
     def predict(self, img):
         if img is None:
