@@ -3,8 +3,11 @@ import os
 import cv2
 import torch
 
-# 🔥 Use your local yolov12 repo
-sys.path.append(os.path.abspath("yolov12"))
+# ✅ FIXED PATH FOR RENDER
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+YOLO_PATH = os.path.join(BASE_DIR, "..", "yolov12")
+
+sys.path.append(YOLO_PATH)
 
 from models.common import DetectMultiBackend
 from utils.general import non_max_suppression
