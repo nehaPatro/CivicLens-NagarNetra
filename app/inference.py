@@ -1,11 +1,5 @@
-import sys
-import os
-import cv2
-
-# Ensure yolov12 repo is accessible
-sys.path.append(os.path.abspath("yolov12"))
-
 from ultralytics import YOLO
+import cv2
 
 
 class YOLOv12Model:
@@ -13,6 +7,9 @@ class YOLOv12Model:
         self.model = YOLO(weights_path)
 
     def predict(self, img):
+        if img is None:
+            return []
+
         results = self.model(img)
 
         detections = []
@@ -23,9 +20,9 @@ class YOLOv12Model:
                 continue
 
             for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                conf = float(box.conf[0].cpu().numpy())
+                cls = int(box.cls[0].cpu().numpy())
 
                 detections.append({
                     "class_id": cls,
@@ -36,13 +33,13 @@ class YOLOv12Model:
         return detections
 
 
-# 🔥 NEW: Draw bounding boxes
 def draw_boxes(img, detections):
+    img = img.copy()
+
     for det in detections:
         x1, y1, x2, y2 = map(int, det["bbox"])
         conf = det["confidence"]
 
-        # Draw RED rectangle
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
         label = f"Pothole {conf:.2f}"
@@ -60,7 +57,6 @@ def draw_boxes(img, detections):
     return img
 
 
-# Optional: readable message
 def format_detections(detections):
     if len(detections) == 0:
         return {
